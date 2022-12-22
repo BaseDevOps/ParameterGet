@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
@@ -14,6 +15,8 @@ import (
 const (
 	formatExports = "exports"
 	formatDotenv  = "dotenv"
+	formatInputParameter = "parameter"
+	formatInputJson = "json"
 )
 
 func main() {
@@ -24,6 +27,7 @@ func main() {
 
 	recursivePtr := flag.Bool("recursive", false, "recursively process parameters on path")
 	format := flag.String("format", formatExports, "output format")
+	formatInput := flag.String("formatInput", formatInputParameter, "input format")
 	flag.Parse()
 
 	if *format == formatExports || *format == formatDotenv {
@@ -34,18 +38,10 @@ func main() {
 	sess := CreateSession()
 	client := CreateClient(sess)
 
-	ExportVariables(client, os.Getenv("AWS_ENV_PATH"), *recursivePtr, *format, "")
+	ExportVariables(client, os.Getenv("AWS_ENV_PATH"), *recursivePtr, *format, *formatInput, "")
 }
 
-func CreateSession() *session.Session {
-	return session.Must(session.NewSession())
-}
-
-func CreateClient(sess *session.Session) *ssm.SSM {
-	return ssm.New(sess)
-}
-
-func ExportVariables(client *ssm.SSM, path string, recursive bool, format string, nextToken string) {
+func ExportVariables(client *ssm.SSM, path string, recursive bool, format string, inputFormat string, nextToken string) {
 	input := &ssm.GetParametersByPathInput{
 		Path:           &path,
 		WithDecryption: aws.Bool(true),
@@ -63,25 +59,61 @@ func ExportVariables(client *ssm.SSM, path string, recursive bool, format string
 	}
 
 	for _, element := range output.Parameters {
-		OutputParameter(path, element, format)
+		name := *element.Name
+		value := *element.Value
+		switch inputFormat {
+		case formatInputJson:
+			OutputParameterByJsonInputType(format, name, value)
+		case formatInputParameter:
+			OutputParameter(path, name, value, format)
+		}
 	}
 
 	if output.NextToken != nil {
-		ExportVariables(client, path, recursive, format, *output.NextToken)
+		ExportVariables(client, path, recursive, format, inputFormat, *output.NextToken)
 	}
 }
 
-func OutputParameter(path string, parameter *ssm.Parameter, format string) {
-	name := *parameter.Name
-	value := *parameter.Value
-
+func OutputParameter(path string, name string, value string, format string) {
 	env := strings.Replace(strings.Trim(name[len(path):], "/"), "/", "_", -1)
 	value = strings.Replace(value, "\n", "\\n", -1)
+	FormatOutput(format, env, value)
+}
 
-	switch format {
-	case formatExports:
-		fmt.Printf("export %s=$'%s'\n", env, value)
-	case formatDotenv:
-		fmt.Printf("%s=\"%s\"\n", env, value)
+func OutputParameterByJsonInputType(outputFormat string, path string, value string) {
+	var jsonMap map[string]interface{}
+	err := json.Unmarshal([]byte(value), &jsonMap)
+	if err != nil {
+		return
+	}
+
+	for key, value := range jsonMap {
+		FormatOutput(outputFormat, key, value)
 	}
 }
+
+func FormatOutput(format string, env string, value interface{}) {
+	switch format {
+	case formatExports:
+		FormatExport(env, value)
+	case formatDotenv:
+		FormatEnv(env, value)
+	}
+}
+
+func FormatEnv(env string, value interface{}) (int, error) {
+	return fmt.Printf("%s=\"%s\"\n", env, value)
+}
+
+func FormatExport(env string, value interface{}) (int, error) {
+	return fmt.Printf("export %s=$'%s'\n", env, value)
+}
+
+func CreateSession() *session.Session {
+	return session.Must(session.NewSession())
+}
+
+func CreateClient(sess *session.Session) *ssm.SSM {
+	return ssm.New(sess)
+}
+

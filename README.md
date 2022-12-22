@@ -97,6 +97,15 @@ For a local development, you you can still use:
 $ docker run -t my-app
 ```
 
+## How to build linux amd64 binarys
+
+To build and use the binaries on dockerfile use the command bellow:
+```
+$ CGO_ENABLED=0 go build -o aws-env-linux ./aws-env.go
+```
+
+<b>Note</b>: This was tested just to linux amd64 OS
+
 ## Considerations
 
 * As this script is still in development, its usage **may** change. Lock version to the
@@ -118,3 +127,5 @@ CMD ["/bin/bash", "-c", "eval $(aws-env) && rails s Puma"]
 https://aws.amazon.com/blogs/compute/managing-secrets-for-amazon-ecs-applications-using-parameter-store-and-iam-roles-for-tasks/)
 
 * Always use KMS for parameters encryption - store them as "SecureString"
+
+
