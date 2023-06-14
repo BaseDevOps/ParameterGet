@@ -4,19 +4,20 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ssm"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ssm"
 )
 
 const (
-	formatExports = "exports"
-	formatDotenv  = "dotenv"
+	formatExports        = "exports"
+	formatDotenv         = "dotenv"
 	formatInputParameter = "parameter"
-	formatInputJson = "json"
+	formatInputJson      = "json"
 )
 
 func main() {
@@ -106,7 +107,7 @@ func FormatEnv(env string, value interface{}) (int, error) {
 }
 
 func FormatExport(env string, value interface{}) (int, error) {
-	return fmt.Printf("export %s=$'%s'\n", env, value)
+	return fmt.Printf("export %s='%s'\n", env, value)
 }
 
 func CreateSession() *session.Session {
@@ -116,4 +117,3 @@ func CreateSession() *session.Session {
 func CreateClient(sess *session.Session) *ssm.SSM {
 	return ssm.New(sess)
 }
-
